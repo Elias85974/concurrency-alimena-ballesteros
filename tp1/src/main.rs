@@ -82,20 +82,6 @@ fn format_response(status_code: u16, body: &str) -> String {
     )
 }
 
-/*
-fn deconstruct_route(route: &str) -> Routes {
-    let full_request = route.split(":").collect();
-    let route = full_request[0]; /lol/lal/sas/
-    let params = full_request[1]; pi/ 20
-}
-
-struct Routes {
-    route: &'_ str,
-    params: &'_[str]
-}
-
- */
-
 fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:3030")?;
     println!("Server listening in http://localhost:3030");
