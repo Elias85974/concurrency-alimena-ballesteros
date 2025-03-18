@@ -25,18 +25,23 @@ fn handle_request(mut stream: TcpStream) {
     if !parts[2].starts_with("HTTP") {
         return;
     }
-
+    //Get the route separated by "/", skipping the first element that is empty
     let route = parts[1].split("/").skip(1).collect::<Vec<_>>();
     println!("Route: {:?}", route);
 
+    //Check if the route is pi
     if route[0].eq("pi") {
+        //Proceed to calculate pi
         let response = handle_pi(route);
         println!("Response: {}", response);
+        //Send the response to the client
         stream.write_all(response.as_bytes()).unwrap()
     }
 }
 
+
 fn handle_pi(route: Vec<&str>) -> String {
+    //Verifies that a param is given
     if route.len() < 2 {
         return format_response(400, "Bad Request: Missing parameter");
     }
@@ -44,6 +49,7 @@ fn handle_pi(route: Vec<&str>) -> String {
     let param = route[1];
 
     if let Some(num) = param.strip_prefix(":") {
+        //Check if the parameter is a number
         if let Ok(i) = num.parse::<u64>() {
             let start = Instant::now();
             let result = calculate_pi(i);
