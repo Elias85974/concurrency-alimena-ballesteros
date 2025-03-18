@@ -1,5 +1,6 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::time::Instant;
 
 fn handle_request(mut stream: TcpStream) {
 
@@ -44,10 +45,12 @@ fn handle_pi(route: Vec<&str>) -> String {
 
     if let Some(num) = param.strip_prefix(":") {
         if let Ok(i) = num.parse::<u64>() {
+            let start = Instant::now();
             let result = calculate_pi(i);
+            let finish: f64 = start.elapsed().as_millis() as f64 / 1000.0;
             return format_response(200, &format!(
                 "Valor de pi para el termino {}: {}, (Tiempo: {}s)",
-                i, result, "0"
+                i, result, finish
             ));
         }
     }
