@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::time::Instant;
+use std::thread;
 
 fn handle_request(mut stream: TcpStream) {
 
@@ -95,7 +96,9 @@ fn main() -> std::io::Result<()> {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                handle_request(stream)
+                thread::spawn(|| {
+                    handle_request(stream);
+                });
             }
             Err(_) => {
                 println!("Connection failed")
