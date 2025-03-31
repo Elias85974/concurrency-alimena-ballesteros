@@ -1,91 +1,60 @@
+use std::io::Error;
 use std::thread;
+use log::error;
 use crate::file_searcher;
 
-pub fn search<'a>(strategy: &'a str, pattern: &'a str, files: Vec<String>) -> Vec<Vec<String>> {
-    let result = match strategy {
+pub fn search<'a>(strategy: &'a str, pattern: &'a str, files: Vec<String>) {
+    match strategy {
         "seq" => sequential(pattern, files),
         "conc" => concurrent(pattern, files),
         "c-chunk" => chunk(pattern, files, 5),
-        _ => Vec::new()
+        _ => error!("No method found for grep")
     };
-    result
 }
 
 fn find_in_line(pattern: &str, linea: &str) -> bool {
-    linea.eq(pattern)
+    linea.contains(pattern)
 }
 
-fn chunk(pattern: &str, files: Vec<String>, chunk_size: usize) -> Vec<Vec<String>> {
-    let mut handles = Vec::new();
-
+fn chunk(pattern: &str, files: Vec<String>, chunk_size: usize) {
     for file in files {
         let pattern = pattern.to_string();
         let lines: Vec<String> = file.lines().map(|line| line.to_string()).collect();
-
-        let handle = thread::spawn(move || {
-            let mut chunk_handles = Vec::new();
-
+        thread::spawn(move || {
             for chunk in lines.chunks(chunk_size) {
                 let pattern = pattern.clone();
                 let chunk = chunk.to_vec();
 
-                let chunk_handle = thread::spawn(move || {
+                thread::spawn(move || {
                     chunk.into_iter()
                         .filter(|line| find_in_line(&pattern, line))
-                        .map(|line| line.to_string())
-                        .collect::<Vec<String>>()
+                        .map(|line| println!("{}: {}", 1, line.to_string()))
                 });
-
-                chunk_handles.push(chunk_handle);
             }
-
-            let mut result = Vec::new();
-            for chunk_handle in chunk_handles {
-                result.push(chunk_handle.join().unwrap());
-            }
-
-            result
         });
-
-        handles.push(handle);
     }
-
-    handles.into_iter()
-        .map(|h| h.join().unwrap())
-        .flatten()
-        .collect()
 }
 
-fn concurrent(pattern: &str, files: Vec<String>) -> Vec<Vec<String>> {
-    let mut handles = Vec::new();
-
+fn concurrent(pattern: &str, files: Vec<String>) {
     for file in files {
         let pattern = pattern.to_string();
-        let handle = thread::spawn(move || {
+        thread::spawn(move || {
             file.lines()
                 .filter(|line| find_in_line(&pattern, line))
-                .map(|line| line.to_string())
-                .collect::<Vec<String>>()
+                .for_each(|line| println!("{}: {}", 1, line.to_string()))
         });
-        handles.push(handle);
     }
-
-    handles.into_iter()
-        .map(|t| t.join().unwrap())
-        .collect()
 }
 
-fn sequential(pattern: &str, files: Vec<String>) -> Vec<Vec<String>> {
-    let mut linesfound: Vec<Vec<String>> = Vec::new();
+fn sequential(pattern: &str, files: Vec<String>) {
     for file in files {
-        let mut lines_in_file: Vec<String> = Vec::new();
         let text = file_searcher::find(file.as_str());
-        for line in text.split("\n") {
+        let mut line_number = 0;
+        for line in text.split("\n").map(|line| line.trim_end()) {
             if find_in_line(pattern, line) {
-                lines_in_file.push(line.to_string());
+                println!("{}: {}", line_number, line.to_string());
+                line_number += 1;
             }
         }
-        linesfound.push(lines_in_file);
     }
-    linesfound
 }
