@@ -22,7 +22,7 @@ pub fn search<'a>(strategy: &'a str, pattern: &'a str, files: Vec<String>) -> Ve
 }
 
 fn find_in_line(pattern: &str, linea: &str) -> bool {
-    linea.contains(pattern)
+    linea.to_lowercase().contains(pattern)
 }
 
 fn chunk(pattern: &str, files: Vec<String>, chunk_size: usize) -> Vec<FileResult> {
@@ -31,7 +31,8 @@ fn chunk(pattern: &str, files: Vec<String>, chunk_size: usize) -> Vec<FileResult
     for file in files {
         let pattern = pattern.to_string();
         let file_clone = file.clone();
-        let lines: Vec<String> = file.lines().map(|line| line.to_string()).collect();
+        let text = file_searcher::find(file.as_str());
+        let lines: Vec<String> = text.lines().map(|line| line.to_string()).collect();
 
         let handle = thread::spawn(move || {
             let mut chunk_handles = Vec::new();
