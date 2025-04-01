@@ -1,4 +1,5 @@
 use std::thread;
+use std::time::Instant;
 use crate::file_searcher;
 
 pub struct FileResult {
@@ -11,21 +12,22 @@ pub struct LineResult {
     pub line_content: String
 }
 
-pub fn search<'a>(strategy: &'a str, pattern: &'a str, files: Vec<String>) -> (i64, Vec<FileResult>) {
+pub fn search<'a>(strategy: &'a str, pattern: &'a str, files: Vec<String>) -> (f64, Vec<FileResult>) {
+    let starttime = Instant::now();
     let result = match strategy {
         "seq" => sequential(pattern, files),
         "conc" => concurrent(pattern, files),
-        "c-chunk" => chunk(pattern, files, 5),
-        _ => (0, Vec::new())
+        "c-chunk" => chunk(pattern, files, 100),
+        _ => Vec::new()
     };
-    result
+    (starttime.elapsed().as_secs_f64(), result)
 }
 
 fn find_in_line(pattern: &str, linea: &str) -> bool {
     linea.to_lowercase().contains(pattern)
 }
 
-fn chunk(pattern: &str, files: Vec<String>, chunk_size: usize) -> (i64, Vec<FileResult>) {
+fn chunk(pattern: &str, files: Vec<String>, chunk_size: usize) -> Vec<FileResult> {
     let mut threads = Vec::new();
 
     for file in files {
@@ -72,19 +74,19 @@ fn chunk(pattern: &str, files: Vec<String>, chunk_size: usize) -> (i64, Vec<File
         threads.push(thread);
     }
 
-    (0, threads.into_iter()
+    threads.into_iter()
         .map(|t| t.join().unwrap())
-        .collect())
+        .collect()
 }
 
-fn concurrent(pattern: &str, files: Vec<String>) -> (i64, Vec<FileResult>) {
-    let mut handles = Vec::new();
+fn concurrent(pattern: &str, files: Vec<String>) -> Vec<FileResult> {
+    let mut threads = Vec::new();
 
     for file in files {
         let pattern = pattern.to_string();
         let file_name = file.clone();
         let text = file_searcher::find(file.as_str());
-        let handle = thread::spawn(move || {
+        let thread = thread::spawn(move || {
             let mut line_number = 1;
             let results = text.lines()
                 .filter_map(|line| {
@@ -99,15 +101,15 @@ fn concurrent(pattern: &str, files: Vec<String>) -> (i64, Vec<FileResult>) {
                 .collect::<Vec<LineResult>>();
             FileResult { file_name: get_file_name(file_name), lines: results }
         });
-        handles.push(handle);
+        threads.push(thread);
     }
 
-    (0, handles.into_iter()
+    threads.into_iter()
         .map(|t| t.join().unwrap())
-        .collect())
+        .collect()
 }
 
-fn sequential(pattern: &str, files: Vec<String>) -> (i64, Vec<FileResult>) {
+fn sequential(pattern: &str, files: Vec<String>) -> Vec<FileResult> {
     let mut linesfound: Vec<FileResult> = Vec::new();
     for file in files {
         let mut lines_in_file: Vec<LineResult> = Vec::new();
@@ -122,7 +124,7 @@ fn sequential(pattern: &str, files: Vec<String>) -> (i64, Vec<FileResult>) {
         let file_name = get_file_name(file);
         linesfound.push(FileResult {file_name, lines: lines_in_file});
     }
-    (0, linesfound)
+    linesfound
 }
 
 fn get_file_name(file: String) -> String {
