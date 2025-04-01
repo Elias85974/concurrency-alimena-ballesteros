@@ -9,8 +9,9 @@ fn main() {
     let pattern = args[2].as_str();
     let files = args[3..].iter().map(|file| file.to_string()).collect();
     let result = grep::search(strategy, pattern, files);
-    result.iter().for_each(|file| {
+    result.1.iter().for_each(|file| {
         if !file.lines.is_empty() { println!("{} found in {}:", pattern, file.file_name); }
         file.lines.iter().for_each(|line| {println!("Line {}: {}", line.line_number, line.line_content)})
     });
+    println!("Total processing time: {}s", result.0);
 }
