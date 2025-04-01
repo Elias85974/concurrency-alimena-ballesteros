@@ -1,3 +1,6 @@
+mod threadpool;
+mod worker;
+
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::time::Instant;
