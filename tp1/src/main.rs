@@ -39,7 +39,6 @@ fn handle_request(mut stream: TcpStream) {
     }
 }
 
-
 fn handle_pi(route: Vec<&str>) -> String {
     //Verifies that a param is given
     if route.len() < 2 {
