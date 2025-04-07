@@ -1,2 +1,5 @@
-tp1/target
-tp1/Cargo.lock
+# Ignorar todas las carpetas target en cualquier subdirectorio
+**/target/
+
+# Ignorar todos los archivos Cargo.lock en cualquier subdirectorio
+**/Cargo.lock
