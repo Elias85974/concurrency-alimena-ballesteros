@@ -1,7 +1,10 @@
+mod threadpool;
+mod worker;
+
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::time::Instant;
-use std::thread;
+use crate::threadpool::ThreadPool;
 
 fn handle_request(mut stream: TcpStream) {
 
@@ -92,13 +95,12 @@ fn format_response(status_code: u16, body: &str) -> String {
 fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:3030")?;
     println!("Server listening in http://localhost:3030");
+    let pool = ThreadPool::new(4);
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                thread::spawn(|| {
-                    handle_request(stream);
-                });
+                pool.execute(|| handle_request(stream));
             }
             Err(_) => {
                 println!("Connection failed")
