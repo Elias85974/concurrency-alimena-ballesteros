@@ -1,0 +1,8 @@
+[package]
+name = "tp4"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+grep_app = { path = "../grep_app" }
