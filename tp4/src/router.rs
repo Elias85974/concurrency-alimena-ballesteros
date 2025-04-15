@@ -5,7 +5,7 @@ pub struct Router {
 }
 
 pub trait Route {
-    fn execute(&self, params: Vec<&str>) -> String;
+    fn execute(&self, params: Vec<&str>, body: &str) -> String;
     fn matches(&self, path: &str) -> bool;
 }
 
