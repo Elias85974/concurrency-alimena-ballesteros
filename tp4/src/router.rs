@@ -5,7 +5,7 @@ pub struct Router {
 }
 
 pub trait Route {
-    fn execute(&self, params: Vec<&str>, body: &str) -> String;
+    fn execute(&self, params: Option<Vec<&str>>, body: Option<&str>) -> String;
     fn matches(&self, path: &str) -> bool;
 }
 
@@ -21,11 +21,11 @@ impl Router {
             .push(route);
     }
 
-    pub fn execute_route(&self, method: &str, path: &str, params: Vec<&str>) -> Option<String> {
+    pub fn execute_route(&self, method: &str, path: &str, params: Option<Vec<&str>>, body: Option<&str>) -> Option<String> {
         if let Some(routes) = self.routes.get(method) {
             for route in routes {
                 if route.matches(path) {
-                    return Some(route.execute(params));
+                    return Some(route.execute(params, body));
                 }
             }
         }
