@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 pub struct Router {
-    routes: HashMap<String, Vec<Box<dyn Route>>>,
+    routes: HashMap<String, Vec<Box<dyn Route + Send + Sync>>>,
 }
 
-pub trait Route {
-    fn execute(&self, params: Option<Vec<&str>>, body: Option<&str>) -> String;
+pub trait Route: Send + Sync {
+    fn execute(&self, params: Option<Vec<&str>>, body: Option<&str>) -> (u16, String);
     fn matches(&self, path: &str) -> bool;
 }
 
@@ -21,7 +21,7 @@ impl Router {
             .push(route);
     }
 
-    pub fn execute_route(&self, method: &str, path: &str, params: Option<Vec<&str>>, body: Option<&str>) -> Option<String> {
+    pub fn execute_route(&self, method: &str, path: &str, params: Option<Vec<&str>>, body: Option<&str>) -> Option<(u16, String)> {
         if let Some(routes) = self.routes.get(method) {
             for route in routes {
                 if route.matches(path) {

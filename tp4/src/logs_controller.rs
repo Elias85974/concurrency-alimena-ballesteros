@@ -13,25 +13,46 @@ impl UploadRoute {
     }
 }
 
-impl Route for UploadRoute {
-    fn execute(&self, params: Option<Vec<&str>>, body: Option<&str>) -> String {
-        if let Some(file) = body {
-            // Esperamos por el permiso del semáforo (limita a 4 uploads)
-            let _ = self.log_handler.upload_semaphore.acquire();
-            let grep_result = grep::search("exception", file);
-            let _ = self.log_handler.upload_semaphore.close();
-
-            // Escribimos en logs bajo exclusión mutua
-            let mut logs = self.log_handler.logs.write().unwrap();
-            // Ejemplo de escritura
-            logs.entry("upload.txt".to_string()).or_insert(grep_result);
-
-            "Upload recibido correctamente".to_string()
-        }
-        else {
-            "No me pasaste un file gordo".to_string()
+fn extract_filename(body: &str) -> Option<String> {
+    for line in body.lines() {
+        if line.starts_with("Content-Disposition") {
+            if let Some(start) = line.find("filename=\"") {
+                let rest = &line[start + 10..];
+                if let Some(end) = rest.find('"') {
+                    return Some(rest[..end].to_string());
+                }
+            }
         }
     }
+    None
+}
+
+impl Route for UploadRoute {
+    fn execute(&self, params: Option<Vec<&str>>, body: Option<&str>) -> (u16, String) {
+        if let Some(file) = body {
+            if let Some(file_name) = extract_filename(file) {
+                println!("File name: {}", file_name);
+
+                // Intentamos adquirir el semáforo sin bloquear
+                if let Ok(_permit) = self.log_handler.upload_semaphore.try_acquire() {
+                    let grep_result = grep::search("exception", file);
+
+                    let mut logs = self.log_handler.logs.write().unwrap();
+                    logs.entry(file_name.to_string()).or_insert(grep_result);
+
+                    (200, "Upload recibido correctamente".to_string())
+                } else {
+                    // No se pudo adquirir el semáforo: 429 Too Many Requests
+                    (429, "Too many uploads in progress. Try again later.".to_string())
+                }
+            } else {
+                (400, "Nombre de archivo invalido".to_string())
+            }
+        } else {
+            (400, "No me pasaste un file gordo".to_string())
+        }
+    }
+
 
     fn matches(&self, path: &str) -> bool {
         path == "/upload"
@@ -49,12 +70,39 @@ impl StatsRoute {
     }
 }
 
+use std::collections::HashMap;
+
 impl Route for StatsRoute {
-    fn execute(&self, params: Option<Vec<&str>>, body: Option<&str>) -> String {
-        todo!()
+    fn execute(&self, _params: Option<Vec<&str>>, _body: Option<&str>) -> (u16, String) {
+        let logs = self.log_handler.logs.read().unwrap();
+
+        let files_processed = logs.len();
+        let total_exceptions: usize = logs.values().map(|v| v.len()).sum();
+
+        // Construimos manualmente el string tipo JSON del mapa
+        let mut per_file = String::from("{");
+        for (i, (filename, results)) in logs.iter().enumerate() {
+            per_file.push('"');
+            per_file.push_str(filename);
+            per_file.push_str("\": ");
+            per_file.push_str(&results.len().to_string());
+            if i < logs.len() - 1 {
+                per_file.push_str(", ");
+            }
+        }
+        per_file.push('}');
+
+        let response = format!(
+            "Total exceptions: {}\nFiles processed: {}\nPer file: {}",
+            total_exceptions, files_processed, per_file
+        );
+
+        (200, response)
     }
 
     fn matches(&self, path: &str) -> bool {
         path == "/stats"
     }
 }
+
+

@@ -6,40 +6,77 @@ use crate::log_handler::LogHandler;
 use crate::logs_controller::{StatsRoute, UploadRoute};
 use crate::router::Router;
 
-fn handle_request(mut stream: TcpStream) {
+fn handle_request(mut stream: TcpStream, router: Arc<Router>) {
+    let mut buffer = Vec::new();
+    let mut temp_buf = [0; 1024];
 
-    let mut buffer = [0; 1024];
-    //this prevents the server from crashing when the client sends an empty request
-    if stream.read(&mut buffer).is_err() {
-        return;
+    // Read from stream until headers are fully received (\r\n\r\n marks header-body boundary)
+    while let Ok(n) = stream.read(&mut temp_buf) {
+        if n == 0 {
+            return;
+        }
+
+        buffer.extend_from_slice(&temp_buf[..n]);
+
+        // Check if we've reached the end of the headers
+        if buffer.windows(4).any(|w| w == b"\r\n\r\n") {
+            break;
+        }
     }
 
+    // Convert headers to string for parsing
+    let headers = String::from_utf8_lossy(&buffer);
 
-    //Convert the buffer to a string
-    let message = String::from_utf8_lossy(&buffer);
-    println!("{}",message);
-    //Split the message by lines
-    let lines: Vec<&str> = message.lines().collect();
-    if lines.is_empty() {
-        return;
+    // Extract Content-Length from headers to know how many bytes of body to read
+    let content_length = headers
+        .lines()
+        .find(|line| line.to_lowercase().starts_with("content-length"))
+        .and_then(|line| line.split(':').nth(1))
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .unwrap_or(0);
+
+    // Find where headers end and body begins
+    let header_end_index = buffer.windows(4).position(|w| w == b"\r\n\r\n");
+    if header_end_index.is_none() {
+        return; // Invalid request, no header-body boundary
+    }
+    let split_at = header_end_index.unwrap() + 4;
+    let mut body_bytes = buffer[split_at..].to_vec();
+
+    // If the body isn't fully received yet, continue reading from the stream
+    while body_bytes.len() < content_length {
+        let n = stream.read(&mut temp_buf).unwrap_or(0);
+        if n == 0 {
+            break;
+        }
+        body_bytes.extend_from_slice(&temp_buf[..n]);
     }
 
-    //Get the first line of the message
-    let first_line = lines[0];
-    let parts = first_line.split_whitespace().collect::<Vec<_>>();
-    //Verify that it is an HTTP call
-    if !parts[2].starts_with("HTTP") {
-        return;
-    }
-    //Get the route separated by "/", skipping the first element that is empty
-    let route = parts[1].split("/").skip(1).collect::<Vec<_>>();
-    println!("Route: {:?}", route);
+    // Convert full body to a string
+    let body = String::from_utf8_lossy(&body_bytes).to_string();
 
-    match &route[0] {
-        _ => {}
+    // Now, parse the request line (e.g., "POST /upload HTTP/1.1")
+    let request_line = headers.lines().next().unwrap_or("");
+    let parts: Vec<&str> = request_line.split_whitespace().collect();
+    if parts.len() < 3 || !parts[2].starts_with("HTTP") {
+        return; // Invalid request line
     }
 
-    // stream.write_all(response.as_bytes()).unwrap()
+    let method = parts[0];
+    let route_with_params = parts[1];
+    let mut route_parts = route_with_params.split(':');
+    let route = route_parts.next().unwrap_or("");
+    let params: Vec<&str> = route_parts.collect();
+
+    // Execute the corresponding route with method, path, params and the full body
+    let params_option = if params.is_empty() { None } else { Some(params) };
+    let body_option = if body.is_empty() { None } else { Some(body.as_str()) };
+    if let Some(response) = router.execute_route(method, route, params_option, body_option) {
+        stream.write_all(format_response(response.0, response.1.as_str()).as_bytes()).unwrap()
+    }
+    else {
+        stream.write_all(format_response(500, "Algo falló").as_bytes()).unwrap()
+    }
 }
 
 fn format_response(status_code: u16, body: &str) -> String {
@@ -65,10 +102,14 @@ pub fn execute() -> std::io::Result<()> {
     router.add_route("POST", Box::new(upload_route));
     router.add_route("GET", Box::new(stats_route));
 
+    let shared_router = Arc::new(router);
+
+
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                pool.execute(|| handle_request(stream));
+                let shared_router = Arc::clone(&shared_router); // clone Arc pointer (not the inner value)
+                pool.execute(|| handle_request(stream, shared_router));
             }
             Err(_) => {
                 println!("Connection failed")
