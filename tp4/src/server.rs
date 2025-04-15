@@ -1,7 +1,9 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::Arc;
 use crate::threadpool::ThreadPool;
-use grep_app::*;
+use crate::log_handler::LogHandler;
+use crate::logs_controller::{StatsRoute, UploadRoute};
 use crate::router::Router;
 
 fn handle_request(mut stream: TcpStream) {
@@ -52,9 +54,16 @@ fn format_response(status_code: u16, body: &str) -> String {
 pub fn execute() -> std::io::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:3030")?;
     println!("Server listening in http://localhost:3030");
-    let pool = ThreadPool::new(4);
-    let router = Router::new();
+    let pool = ThreadPool::new(8);
+    let log_handler = Arc::new(LogHandler::new(4));
 
+    // Inicializar las rutas
+    let upload_route = UploadRoute::new(Arc::clone(&log_handler));
+    let stats_route = StatsRoute::new(Arc::clone(&log_handler));
+
+    let mut router = Router::new();
+    router.add_route("POST", Box::new(upload_route));
+    router.add_route("GET", Box::new(stats_route));
 
     for stream in listener.incoming() {
         match stream {
