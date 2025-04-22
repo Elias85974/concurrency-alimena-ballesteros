@@ -75,7 +75,7 @@ fn handle_request(mut stream: TcpStream, router: Arc<Router>) {
     stream.write_all(format_response(response).as_bytes()).unwrap()
 }
 
-fn format_response(response: (u16, &str)) -> String {
+fn format_response(response: (u16, String)) -> String {
     let status_code = response.0;
     let body = response.1;
     let status_text = get_status_text(status_code);
