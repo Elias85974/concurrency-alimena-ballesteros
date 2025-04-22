@@ -50,9 +50,12 @@ impl Route for UploadRoute {
         (400, "File not found or empty")
     }
 
+    fn path(&self) -> &str {
+        "/upload"
+    }
 
-    fn matches(&self, path: &str) -> bool {
-        path == "/upload"
+    fn description(&self) -> &str {
+        "Upload a file for analysis"
     }
 }
 
@@ -95,8 +98,12 @@ impl Route for StatsRoute {
         (200, response.as_str())
     }
 
-    fn matches(&self, path: &str) -> bool {
-        path == "/stats"
+    fn path(&self) -> &str {
+        "/stats"
+    }
+
+    fn description(&self) -> &str {
+        "Show statistics"
     }
 }
 

@@ -6,7 +6,11 @@ pub struct Router {
 
 pub trait Route: Send + Sync {
     fn execute(&self, params: Option<Vec<&str>>, body: Option<&str>) -> (u16, &str);
-    fn matches(&self, path: &str) -> bool;
+    fn matches(&self, path: &str) -> bool {
+        path == self.path()
+    }
+    fn path(&self) -> &str;
+    fn description(&self) -> &str;
 }
 
 impl Router {
@@ -32,7 +36,7 @@ impl Router {
         let mut response = String::new();
         self.routes.iter().for_each(|(key, values)| {
             values.iter().for_each(|value| {
-                response.push_str(&format!("{} {:?}\n", key, value));
+                response.push_str(&format!("{} {} - {}\n", key, value.path(), value.description()));
             });
         });
         (400, response.as_str())
