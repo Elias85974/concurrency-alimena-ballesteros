@@ -28,29 +28,26 @@ fn extract_filename(body: &str) -> Option<String> {
 }
 
 impl Route for UploadRoute {
-    fn execute(&self, params: Option<Vec<&str>>, body: Option<&str>) -> (u16, String) {
+    fn execute(&self, params: Option<Vec<&str>>, body: Option<&str>) -> (u16, &str) {
         if let Some(file) = body {
             if let Some(file_name) = extract_filename(file) {
                 println!("File name: {}", file_name);
 
                 // Intentamos adquirir el semáforo sin bloquear
-                if let Ok(_permit) = self.log_handler.upload_semaphore.try_acquire() {
+                return if let Ok(_permit) = self.log_handler.upload_semaphore.try_acquire() {
                     let grep_result = grep::search("exception", file);
 
                     let mut logs = self.log_handler.logs.write().unwrap();
                     logs.entry(file_name.to_string()).or_insert(grep_result);
 
-                    (200, "Upload recibido correctamente".to_string())
+                    (200, format!("Processed file: {}", file_name).as_str())
                 } else {
                     // No se pudo adquirir el semáforo: 429 Too Many Requests
-                    (429, "Too many uploads in progress. Try again later.".to_string())
+                    (429, "Too many files being processed")
                 }
-            } else {
-                (400, "Nombre de archivo invalido".to_string())
             }
-        } else {
-            (400, "No me pasaste un file gordo".to_string())
         }
+        (400, "File not found or empty")
     }
 
 
@@ -70,10 +67,8 @@ impl StatsRoute {
     }
 }
 
-use std::collections::HashMap;
-
 impl Route for StatsRoute {
-    fn execute(&self, _params: Option<Vec<&str>>, _body: Option<&str>) -> (u16, String) {
+    fn execute(&self, _params: Option<Vec<&str>>, _body: Option<&str>) -> (u16, &str) {
         let logs = self.log_handler.logs.read().unwrap();
 
         let files_processed = logs.len();
@@ -97,7 +92,7 @@ impl Route for StatsRoute {
             total_exceptions, files_processed, per_file
         );
 
-        (200, response)
+        (200, response.as_str())
     }
 
     fn matches(&self, path: &str) -> bool {

@@ -5,7 +5,7 @@ pub struct Router {
 }
 
 pub trait Route: Send + Sync {
-    fn execute(&self, params: Option<Vec<&str>>, body: Option<&str>) -> (u16, String);
+    fn execute(&self, params: Option<Vec<&str>>, body: Option<&str>) -> (u16, &str);
     fn matches(&self, path: &str) -> bool;
 }
 
@@ -21,14 +21,20 @@ impl Router {
             .push(route);
     }
 
-    pub fn execute_route(&self, method: &str, path: &str, params: Option<Vec<&str>>, body: Option<&str>) -> Option<(u16, String)> {
+    pub fn execute_route(&self, method: &str, path: &str, params: Option<Vec<&str>>, body: Option<&str>) -> (u16, &str) {
         if let Some(routes) = self.routes.get(method) {
             for route in routes {
                 if route.matches(path) {
-                    return Some(route.execute(params, body));
+                    return route.execute(params, body);
                 }
             }
         }
-        None
+        let mut response = String::new();
+        self.routes.iter().for_each(|(key, values)| {
+            values.iter().for_each(|value| {
+                response.push_str(&format!("{} {:?}\n", key, value));
+            });
+        });
+        (400, response.as_str())
     }
 }
