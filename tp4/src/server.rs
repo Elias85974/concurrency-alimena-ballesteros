@@ -71,21 +71,30 @@ fn handle_request(mut stream: TcpStream, router: Arc<Router>) {
     // Execute the corresponding route with method, path, params and the full body
     let params_option = if params.is_empty() { None } else { Some(params) };
     let body_option = if body.is_empty() { None } else { Some(body.as_str()) };
-    if let Some(response) = router.execute_route(method, route, params_option, body_option) {
-        stream.write_all(format_response(response.0, response.1.as_str()).as_bytes()).unwrap()
-    }
-    else {
-        stream.write_all(format_response(500, "Algo falló").as_bytes()).unwrap()
-    }
+    let response = router.execute_route(method, route, params_option, body_option);
+    stream.write_all(format_response(response).as_bytes()).unwrap()
 }
 
-fn format_response(status_code: u16, body: &str) -> String {
+fn format_response(response: (u16, &str)) -> String {
+    let status_code = response.0;
+    let body = response.1;
+    let status_text = get_status_text(status_code);
     format!(
-        "HTTP/1.1 {} OK\r\nContent-Length: {}\r\nContent-Type: text/plain\r\n\r\n{}",
+        "HTTP/1.1 {} {}\r\nContent-Length: {}\r\nContent-Type: text/plain\r\n\r\n{}",
         status_code,
+        status_text,
         body.len(),
         body
     )
+}
+
+fn get_status_text(status_code: u16) -> &'static str {
+    match status_code {
+        200 => "OK",
+        400 => "Bad Request",
+        429 => "Too Many Requests",
+        _ => "Unknown Status",
+    }
 }
 
 pub fn execute() -> std::io::Result<()> {
