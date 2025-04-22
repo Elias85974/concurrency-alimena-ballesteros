@@ -28,7 +28,7 @@ fn extract_filename(body: &str) -> Option<String> {
 }
 
 impl Route for UploadRoute {
-    fn execute(&self, params: Option<Vec<&str>>, body: Option<&str>) -> (u16, &str) {
+    fn execute(&self, params: Option<Vec<&str>>, body: Option<&str>) -> (u16, String) {
         if let Some(file) = body {
             if let Some(file_name) = extract_filename(file) {
                 println!("File name: {}", file_name);
@@ -36,18 +36,19 @@ impl Route for UploadRoute {
                 // Intentamos adquirir el semáforo sin bloquear
                 return if let Ok(_permit) = self.log_handler.upload_semaphore.try_acquire() {
                     let grep_result = grep::search("exception", file);
+                    drop(_permit);
 
                     let mut logs = self.log_handler.logs.write().unwrap();
                     logs.entry(file_name.to_string()).or_insert(grep_result);
-
-                    (200, format!("Processed file: {}", file_name).as_str())
+                    let response = format!("Processed file: {}", file_name);
+                    (200, response)
                 } else {
                     // No se pudo adquirir el semáforo: 429 Too Many Requests
-                    (429, "Too many files being processed")
+                    (429, "Too many files being processed".to_string())
                 }
             }
         }
-        (400, "File not found or empty")
+        (400, "File not found or empty".to_string())
     }
 
     fn path(&self) -> &str {
@@ -71,7 +72,7 @@ impl StatsRoute {
 }
 
 impl Route for StatsRoute {
-    fn execute(&self, _params: Option<Vec<&str>>, _body: Option<&str>) -> (u16, &str) {
+    fn execute(&self, _params: Option<Vec<&str>>, _body: Option<&str>) -> (u16, String) {
         let logs = self.log_handler.logs.read().unwrap();
 
         let files_processed = logs.len();
@@ -95,7 +96,7 @@ impl Route for StatsRoute {
             total_exceptions, files_processed, per_file
         );
 
-        (200, response.as_str())
+        (200, response)
     }
 
     fn path(&self) -> &str {
